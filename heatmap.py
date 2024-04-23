@@ -3,6 +3,8 @@ import folium
 from folium.plugins import HeatMap
 import os
 
+print("Helwoldr")
+
 # Caminho relativo para o arquivo CSV
 caminho_arquivo = os.path.join('bases-dados', 'Testing_anatel_acre.csv')
 
@@ -27,4 +29,4 @@ HeatMap(heat_data, radius=10, gradient={0.4: 'blue', 0.65: 'lime', 1: 'red'}).ad
 
 
 # Salvando resultado
-mapa.save(os.path.join('resultado-mapas', 'heatmap_gerasddasdsaaWQE1.html'))
+mapa.save(os.path.join('resultado-mapas', 'heatmap_gerado1.html'))
