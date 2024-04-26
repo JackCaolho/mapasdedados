@@ -1,99 +1,59 @@
+import pandas as pd
 import folium
 from folium.plugins import HeatMapWithTime
+import os
 
-dados = [ [[-41.2545649, -72.7829354, 13],
-    [-36.5986096, 144.6780052, 38],
-    [-34.6396556, -58.7898326, 4],
-    [-34.6037181, -58.38153, 5],
-    [-33.6895237, -53.454704, 17],
-    [-33.583333, -56.833333, 2],
-    [-33.5198333, -53.3693967, 19],
-    [-33.0458456, -71.6196749, 16],
-    [-32.9593609, -60.6617024, 5],
-    [-32.5662724, -53.3765705, 24],
-    [-32.0260806, -53.3951333, 10],
-    [-32.0145182, -52.0406082, 12],
-    [-31.8695131, -54.1615593, 20],
-    [-31.861921, -52.8219388, 9],
-    [-31.8546304, -52.8151659, 7],
-    [-31.7699736, -52.3410161, 35],
-    [-31.766133, -52.5013148, 16]],
-        
-        [[-41.2545649, -72.7829354, 13],
-    [-36.5986096, 144.6780052, 38],
-    [-34.6396556, -58.7898326, 4],
-    [-34.6037181, -58.38153, 5],
-    [-33.6895237, -53.454704, 18],
-    [-33.583333, -56.833333, 1],
-    [-33.5198333, -53.3693967, 21],
-    [-33.0458456, -71.6196749, 16],
-    [-32.9593609, -60.6617024, 5],
-    [-32.5662724, -53.3765705, 24],
-    [-32.0260806, -53.3951333, 10],
-    [-32.0145182, -52.0406082, 16],
-    [-31.8695131, -54.1615593, 20],
-    [-31.861921, -52.8219388, 9],
-    [-31.8546304, -52.8151659, 8],
-    [-31.7699736, -52.3410161, 33],
-    [-31.766133, -52.5013148, 15]],
-         
-         [[-41.2545649, -72.7829354, 13],
-    [-36.5986096, 144.6780052, 39],
-    [-34.6396556, -58.7898326, 4],
-    [-34.6037181, -58.38153, 5],
-    [-33.6895237, -53.454704, 18],
-    [-33.583333, -56.833333, 2],
-    [-33.5198333, -53.3693967, 21],
-    [-33.0458456, -71.6196749, 16],
-    [-32.9593609, -60.6617024, 5],
-    [-32.5662724, -53.3765705, 24],
-    [-32.0260806, -53.3951333, 10],
-    [-32.0145182, -52.0406082, 17],
-    [-31.8695131, -54.1615593, 22],
-    [-31.861921, -52.8219388, 9],
-    [-31.8546304, -52.8151659, 8],
-    [-31.7699736, -52.3410161, 35],
-    [-31.766133, -52.5013148, 16]],
-         
-         [[-41.2545649, -72.7829354, 1],
-    [-36.5986096, 144.6780052, 1],
-    [-34.6396556, -58.7898326, 1],
-    [-34.6037181, -58.38153, 1],
-    [-33.6895237, -53.454704, 1],
-    [-33.583333, -56.833333, 1],
-    [-33.5198333, -53.3693967, 1],
-    [-33.0458456, -71.6196749, 1],
-    [-32.9593609, -60.6617024, 1],
-    [-32.5662724, -53.3765705, 1],
-    [-32.0260806, -53.3951333, 1],
-    [-32.0145182, -52.0406082, 1],
-    [-31.8695131, -54.1615593, 1],
-    [-31.861921, -52.8219388, 1],
-    [-31.8546304, -52.8151659, 1],
-    [-31.7699736, -52.3410161, 1],
-    [-31.766133, -52.5013148, 1],
-    [-41.2545649, -72.7829354, 1],
-    [-36.5986096, 144.6780052, 1],
-    [-34.6396556, -58.7898326, 9],
-    [-34.6037181, -58.38153, 5],
-    [-33.6895237, -53.454704, 1],
-    [-33.583333, -56.833333, 2]]]
-         
-        
-anos = [1, 2, 3, 4]
+# Caminho relativo para o arquivo CSV
+caminho_arquivo = os.path.join('bases-dados', 'densidade-internet-cidades-brasil.csv')
 
-mapa = folium.Map([-15.788497, -47.899873], zoom_start = 4, tiles = "cartodbpositron")
+df = pd.read_csv(caminho_arquivo, sep=';', encoding='latin1')
 
-HeatMapWithTime(data = dados,
-               index = anos,
-               radius = 40,
-               gradient = {0.1: "blue", 0.25: "green", 0.5: "yellow",
-                          0.75: "orange", 1:"red"},
-               min_opacity = 0.3,
-               max_opacity = 1,
-               use_local_extrema = True,
-               auto_play = False,
-               position = "topright").add_to(mapa)
+# Converter as colunas para os tipos corretos
+df['Latitude'] = df['Latitude'].str.replace(',', '.').astype(float)
+df['Longitude'] = df['Longitude'].str.replace(',', '.').astype(float)
+df['densidade'] = df['densidade'].astype(float)
 
-caminho_do_arquivo = "C:\Projeto Gustavo\GITHUB\mapasdedados\Mapa_Animado.html"
-mapa.save(caminho_do_arquivo)
+# Normalizar desidade 0 a 1
+densidade_maxima = df['densidade'].max()
+df['densidade_normalizada'] = df['densidade'] / densidade_maxima
+
+# Segredo de milhoes 
+data_mes_ano = df.groupby(['ano', 'mes']) 
+
+# Apenas para printar
+for name, group in data_mes_ano:
+    print(name)
+    print(group)
+    print('-----------------')
+
+
+# Criar uma lista de dados para cada período de tempo
+data = []
+for name, group in data_mes_ano:
+    data.append(group[['Latitude', 'Longitude', 'densidade_normalizada']].values.tolist())
+
+# Criar um mapa
+m = folium.Map(location=[-15.788497, -47.879873], zoom_start=4)
+
+# Gradiente de cores
+gradiente_cores = {
+    0.1: '#87CEEB',   # Azul céu
+    0.2: '#6495ED',   # Azul claro
+    0.3: '#4169E1',   # Azul médio
+    0.5: '#FFFF00',   # Amarelo
+    0.6: '#FFD700',   # Amarelo médio
+    0.7: '#FFA500',   # Amarelo laranja
+    0.8: '#FF8C00',   # Laranja
+    0.9: '#FF6347',   # Vermelho laranja
+    1.0: '#FF0000'    # Vermelho
+}
+
+
+# Criar o HeatMapWithTime
+hm = HeatMapWithTime(data, index=list(data_mes_ano.groups.keys()), auto_play=True, max_opacity=0.8, radius=20, gradient=gradiente_cores)
+
+# Adicionar ao mapa
+hm.add_to(m)
+
+# Salvar o mapa
+m.save(os.path.join('resultado-mapas', 'sabado_animado4.html'))
