@@ -26,4 +26,4 @@ HeatMap(heat_data, radius=10, gradient={0.4: 'blue', 0.65: 'lime', 1: 'red'}).ad
 
 # Salvando resultado
 mapa.save(os.path.join('resultado-mapas', 'heatmap_gerado1.html'))
-print("mapinha na mao")
+print("Paozinho")
