@@ -4,18 +4,25 @@ from folium.plugins import HeatMapWithTime
 import os
 
 # Caminho relativo para o arquivo CSV
-caminho_arquivo = os.path.join('bases-dados', 'novo_df.csv')
+caminho_arquivo = os.path.join('bases-dados', 'novo_df_internet.csv')
 
 df = pd.read_csv(caminho_arquivo, sep=',', encoding='latin1')
 
-# Normalizar desidade 0 a 1
-densidade_maxima = df['densidade'].max()
-df['densidade_normalizada'] = df['densidade'] / densidade_maxima
+# Excluir dados com longitude maior que 6
+df = df[df['Latitude'] <= 6]
+
+df = df[(df['Longitude'] >= -74) & (df['Longitude'] <= -20)]
+
+df = df[df['densidade'] <= 100]
+
 
 # Segredo de milhoes 
 data_mes_ano = df.groupby(['ano', 'mes']) 
 
 # Criar uma lista de dados para cada período de tempo
+densidade_maxima = 100
+df['densidade_normalizada'] = df['densidade'] / densidade_maxima
+
 data = []
 for name, group in data_mes_ano:
     data.append(group[['Latitude', 'Longitude', 'densidade_normalizada']].values.tolist())
@@ -41,7 +48,7 @@ gradiente_cores = {
 formatted_dates = ['{} - {}'.format(year, month_name) for year, month_name in data_mes_ano.groups.keys()]
 
 # Criar o HeatMapWithTime
-hm = HeatMapWithTime(data, index=formatted_dates, auto_play=True, min_opacity=0.1, max_opacity=1 , radius=15, gradient=gradiente_cores)
+hm = HeatMapWithTime(data, index=formatted_dates, auto_play=True, min_opacity=0.1, max_opacity=1 , radius=10, gradient=gradiente_cores)
 
 # Adicionar ao mapa
 hm.add_to(m)
