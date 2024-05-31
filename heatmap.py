@@ -3,8 +3,6 @@ import folium
 from folium.plugins import HeatMap
 import os
 
-print("Helwoldr")
-
 # Caminho relativo para o arquivo CSV
 caminho_arquivo = os.path.join('bases-dados', 'novo_df.csv')
 

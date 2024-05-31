@@ -7,10 +7,8 @@ from flask import Flask, send_from_directory
 # Caminho do arquivo
 caminho_arquivo1 = os.path.join('bases-nao-tratadas', 'Telefonia fixa', 'Acessos_Telefonia_Fixa_Total.csv')
 
-# Carregar o DataFrame
 df1 = pd.read_csv(caminho_arquivo1, sep=';', encoding='utf-8')
 
-# Caminho do arquivo
 caminho_arquivo2 = os.path.join('bases-nao-tratadas', 'Telefonia fixa', 'Acessos_Telefonia_Fixa_Autorizadas.csv')
 
 caminho_arquivo3 = os.path.join('bases-nao-tratadas', 'Telefonia fixa', 'Acessos_Telefonia_Fixa_Concessionarias_2021-2022_Colunas.csv')
@@ -35,10 +33,9 @@ df3_melted = df3.melt(
 # Dividir a coluna 'Data' em 'Ano' e 'Mês'
 df3_melted[['Ano', 'Mês']] = df3_melted['Data'].str.split('-', expand=True)
 
-# Remover a coluna 'Data' original se não for mais necessária
+# Remover a coluna 'Data'
 df3_melted.drop(columns=['Data'], inplace=True)
 
-# Exibir o DataFrame resultante
 print(df3_melted.head(3))
 
 

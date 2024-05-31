@@ -3,17 +3,12 @@ import folium
 from folium.plugins import HeatMapWithTime
 import os
 
-# Caminho relativo para o arquivo CSV
+# Caminho para o arquivo
 caminho_arquivo = os.path.join('bases-dados', 'novo_df_internet.csv')
 
 df = pd.read_csv(caminho_arquivo, sep=',', encoding='latin1')
 
-# Excluir dados com longitude maior que 6
-df = df[df['Latitude'] <= 6]
-
-df = df[(df['Longitude'] >= -74) & (df['Longitude'] <= -20)]
-
-df = df[df['densidade'] <= 100]
+df = df[(df['Latitude'] <= 6) & (df['Longitude'] >= -74) & (df['Longitude'] <= -20) & (df['densidade'] <= 100)]
 
 
 # Segredo de milhoes 
