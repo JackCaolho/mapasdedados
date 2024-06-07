@@ -1,8 +1,11 @@
 from dash import Dash, html, dcc, Input, Output
 import plotly.express as px
+import plotly.graph_objs as go
 import pandas as pd
 import os
 from flask import Flask, send_from_directory
+import networkx as nx
+import plotly.graph_objects as go
 
 # Caminho dos arquivos
 caminho_arquivo1 = os.path.join('bases-nao-tratadas', 'Telefonia fixa', 'Acessos_Telefonia_Fixa_Total.csv')
@@ -43,7 +46,7 @@ df4_melted['Mês'] = df4_melted['Mês'].astype(int)
 df_conc = pd.concat([df3_melted, df4_melted], ignore_index=True)
 
 
-#Preencher as colunas vazias
+# Preencher as colunas vazias
 df2['Tipo de Pessoa'] = df2['Tipo de Pessoa'].fillna('Desconhecido')
 
 # Agrupar e somar acessos em df
@@ -65,7 +68,28 @@ def agrupar_empresas_por_ano(df, top_n=9):
         df_t10 = pd.concat([df_t10, df_ano], ignore_index=True)
     return df_t10
 
+def agrupar_portabilidade_por_ano(df_p, top_n=4):
+    df_p10 = pd.DataFrame()
+    for ano in df_p['Ano'].unique():
+        df_ano = df_p[df_p['Ano'] == ano]
+
+        # Agrupar NO_PRESTADORA_RECEPTORA
+        total_port_receptora = df_ano.groupby('NO_PRESTADORA_RECEPTORA')['QT_PORTABILIDADE_EFETIVADA'].sum().sort_values(ascending=False)
+        top_port_receptora = total_port_receptora.head(top_n).index
+        df_ano.loc[~df_ano['NO_PRESTADORA_RECEPTORA'].isin(top_port_receptora), 'NO_PRESTADORA_RECEPTORA'] = 'OUTROS'
+
+        # Agrupar NO_PRESTADORA_DOADORA
+        total_port_doadora = df_ano.groupby('NO_PRESTADORA_DOADORA')['QT_PORTABILIDADE_EFETIVADA'].sum().sort_values(ascending=False)
+        top_port_doadora = total_port_doadora.head(top_n).index
+        df_ano.loc[~df_ano['NO_PRESTADORA_DOADORA'].isin(top_port_doadora), 'NO_PRESTADORA_DOADORA'] = 'OUTROS'
+
+        df_ano = df_ano.groupby(['Ano', 'Mês', 'NO_PRESTADORA_DOADORA', 'NO_PRESTADORA_RECEPTORA']).agg({'QT_PORTABILIDADE_EFETIVADA': 'sum'}).reset_index()
+        df_p10 = pd.concat([df_p10, df_ano], ignore_index=True)
+    return df_p10
+
 df_agrupado3 = agrupar_empresas_por_ano(df_agrupado3)
+
+df5 = agrupar_portabilidade_por_ano(df5)
 
 # Concatenar os dataframes
 df_final = pd.concat([df_agrupado, df_agrupado2], ignore_index=True)
@@ -117,6 +141,8 @@ app.layout = html.Div(children=[
     dcc.Graph(id='Acessos_Telefonia_Fixa_SP'),
 
     dcc.Graph(id='pie-chart'),
+
+    dcc.Graph(id='network-graph'),
 
     html.Br(),
 
@@ -180,6 +206,39 @@ def update_pie_chart(selected_year, selected_tipo_pessoa):
     fig3 = px.pie(filtered_df, names='Empresa', values='Total_Acessos_Empresa', title=f'Distribuição de Acessos por Empresa em {selected_year}')
     
     return fig3
+
+# Callback para atualizar o heatmap de correlação
+@app.callback(
+    Output('network-graph', 'figure'),
+    [Input('ano-dropdown', 'value')]
+)
+def update_correlation_heatmap(selected_year):
+    filtered_df5 = df5.copy()
+
+    if selected_year != "Geral":
+        filtered_df5 = filtered_df5[filtered_df5['Ano'] == selected_year]
+
+    # Calcula a matriz de correlação
+    correlation_matrix = filtered_df5.pivot_table(values='QT_PORTABILIDADE_EFETIVADA', 
+                                                  index='NO_PRESTADORA_DOADORA', 
+                                                  columns='NO_PRESTADORA_RECEPTORA', 
+                                                  aggfunc='sum').corr()
+
+    # Cria o heatmap
+    fig4 = go.Figure(data=go.Heatmap(z=correlation_matrix.values,
+                                      x=correlation_matrix.columns,
+                                      y=correlation_matrix.index))
+
+    # Adiciona interatividade ao gráfico
+    fig4.update_layout(
+        title="Matriz de Correlação de Portabilidade",
+        xaxis=dict(title="Receptora"),
+        yaxis=dict(title="Doadora"),
+        plot_bgcolor='white'
+    )
+
+    return fig4
+
 
 
 if __name__ == '__main__':  
