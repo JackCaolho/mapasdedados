@@ -4,23 +4,34 @@ import plotly.graph_objs as go
 import pandas as pd
 import os
 from flask import Flask, send_from_directory
-import networkx as nx
-import plotly.graph_objects as go
 
 # Caminho dos arquivos
 caminho_arquivo1 = os.path.join('bases-nao-tratadas', 'Telefonia fixa', 'Acessos_Telefonia_Fixa_Total.csv')
 caminho_arquivo2 = os.path.join('bases-nao-tratadas', 'Telefonia fixa', 'Acessos_Telefonia_Fixa_Autorizadas.csv')
+caminho_arquivo2c = os.path.join('bases-nao-tratadas', 'Telefonia fixa', 'Acessos_Telefonia_Fixa_Concessionarias.csv')
 caminho_arquivo3 = os.path.join('bases-nao-tratadas', 'Telefonia fixa', 'Acessos_Telefonia_Fixa_Concessionarias_2021-2022_Colunas.csv')
 caminho_arquivo4 = os.path.join('bases-nao-tratadas', 'Telefonia fixa', 'Acessos_Telefonia_Fixa_Concessionarias_2007_2020_Colunas.csv')
 caminho_arquivo5 = os.path.join('bases-nao-tratadas', 'Telefonia fixa', 'CSV_PORTABILIDADE.csv')
 
-
 # Leitura dos arquivos
 df1 = pd.read_csv(caminho_arquivo1, sep=';', encoding='utf-8')
 df2 = pd.read_csv(caminho_arquivo2, sep=';', encoding='utf-8').query('UF == "SP"')
-df3 = pd.read_csv(caminho_arquivo3, sep=';', encoding='utf-8')
-df4 = pd.read_csv(caminho_arquivo4, sep=';', encoding='utf-8')
+df2_con = pd.read_csv(caminho_arquivo2c, sep=';',low_memory=False , encoding='utf-8').query('UF == "SP"')
+df3 = pd.read_csv(caminho_arquivo3, sep=';', encoding='utf-8').query('UF == "SP"')
+df4 = pd.read_csv(caminho_arquivo4, sep=';', encoding='utf-8').query('UF == "SP"')
 df5 = pd.read_csv(caminho_arquivo5, sep=';', encoding='utf-8').query('SG_UF == "SP"')
+
+# Abreviar nome de empresas para 2 palavras
+def abreviar(s):
+    palavras = s.split()
+    return ' '.join(palavras[:2])
+
+df2['Empresa'] = df2['Empresa'].apply(abreviar)
+df2_con['Empresa'] = df2_con['Empresa'].apply(abreviar)
+df3['Empresa'] = df3['Empresa'].apply(abreviar)
+df4['Empresa'] = df4['Empresa'].apply(abreviar)
+df5['NO_PRESTADORA_RECEPTORA'] = df5['NO_PRESTADORA_RECEPTORA'].apply(abreviar)
+df5['NO_PRESTADORA_DOADORA'] = df5['NO_PRESTADORA_DOADORA'].apply(abreviar)
 
 # Transformações no df3 e df4
 df3_melted = df3.melt(
@@ -43,18 +54,26 @@ df4_melted.drop(columns=['Data'], inplace=True)
 df4_melted['Ano'] = df4_melted['Ano'].astype(int)
 df4_melted['Mês'] = df4_melted['Mês'].astype(int)
 
+# juntando dps do melted
 df_conc = pd.concat([df3_melted, df4_melted], ignore_index=True)
 
+# Somando os acessos antes de juntar o df2
+df_agrupado = df2.groupby(['Ano', 'Mês', 'Tipo de Outorga']).agg({'Acessos': 'sum'}).reset_index().rename(columns={'Acessos': 'Total_Acessos'})
+
+# Juntando o df2 com df2_con 
+df2 = pd.concat([df2, df2_con], ignore_index=True)
 
 # Preencher as colunas vazias
 df2['Tipo de Pessoa'] = df2['Tipo de Pessoa'].fillna('Desconhecido')
 
-# Agrupar e somar acessos em df
-df_agrupado = df2.groupby(['Ano', 'Mês', 'Tipo de Outorga']).agg({'Acessos': 'sum'}).reset_index().rename(columns={'Acessos': 'Total_Acessos'})
 
+# Somando os acessos
 df_agrupado2 = df_conc.groupby(['Ano', 'Mês', 'Tipo de Outorga']).agg({'Acessos': 'sum'}).reset_index().rename(columns={'Acessos': 'Total_Acessos'})
 
-df_agrupado3 = df2.groupby(['Ano', 'Mês', 'Empresa', 'Tipo de Pessoa']).agg({'Acessos': 'sum'}).reset_index().rename(columns={'Acessos': 'Total_Acessos_Empresa'})
+df_agrupado3 = df2.groupby(['Ano', 'Mês', 'Empresa','Tipo de Outorga', 'Tipo de Pessoa']).agg({'Acessos': 'sum'}).reset_index().rename(columns={'Acessos': 'Total_Acessos_Empresa'})
+
+# Concatenar os dataframes
+df_final = pd.concat([df_agrupado, df_agrupado2], ignore_index=True)
 
 # Função para agrupar empresas menores e agrupar em "OUTROS" por ano
 def agrupar_empresas_por_ano(df, top_n=9):
@@ -68,7 +87,8 @@ def agrupar_empresas_por_ano(df, top_n=9):
         df_t10 = pd.concat([df_t10, df_ano], ignore_index=True)
     return df_t10
 
-def agrupar_portabilidade_por_ano(df_p, top_n=4):
+# Mesma função mas usado em outro df
+def agrupar_portabilidade_por_ano(df_p, top_n=13):
     df_p10 = pd.DataFrame()
     for ano in df_p['Ano'].unique():
         df_ano = df_p[df_p['Ano'] == ano]
@@ -87,12 +107,30 @@ def agrupar_portabilidade_por_ano(df_p, top_n=4):
         df_p10 = pd.concat([df_p10, df_ano], ignore_index=True)
     return df_p10
 
+# Mesma função mas sem filtrar por ano
+def agrupar_portabilidade_total(df_t, top_n=9):
+    df_t = df_t.copy()
+
+    # Agrupar NO_PRESTADORA_RECEPTORA
+    total_port_receptora = df_t.groupby('NO_PRESTADORA_RECEPTORA')['QT_PORTABILIDADE_EFETIVADA'].sum().sort_values(ascending=False)
+    top_port_receptora = total_port_receptora.head(top_n).index
+    df_t.loc[~df_t['NO_PRESTADORA_RECEPTORA'].isin(top_port_receptora), 'NO_PRESTADORA_RECEPTORA'] = 'OUTROS'
+
+    # Agrupar NO_PRESTADORA_DOADORA
+    total_port_doadora = df_t.groupby('NO_PRESTADORA_DOADORA')['QT_PORTABILIDADE_EFETIVADA'].sum().sort_values(ascending=False)
+    top_port_doadora = total_port_doadora.head(top_n).index
+    df_t.loc[~df_t['NO_PRESTADORA_DOADORA'].isin(top_port_doadora), 'NO_PRESTADORA_DOADORA'] = 'OUTROS'
+
+    df_t = df_t.groupby(['Ano', 'Mês', 'NO_PRESTADORA_DOADORA', 'NO_PRESTADORA_RECEPTORA']).agg({'QT_PORTABILIDADE_EFETIVADA': 'sum'}).reset_index()
+    
+    return df_t
+
+# Utilizando a função
+df6 = agrupar_portabilidade_total(df5)
+
 df_agrupado3 = agrupar_empresas_por_ano(df_agrupado3)
 
 df5 = agrupar_portabilidade_por_ano(df5)
-
-# Concatenar os dataframes
-df_final = pd.concat([df_agrupado, df_agrupado2], ignore_index=True)
 
 # Inicializar o servidor Flask
 server = Flask(__name__)
@@ -130,11 +168,19 @@ app.layout = html.Div(children=[
     html.H1(children='Dados ANATEL'),
     html.H2(children='Gráfico ao longo do tempo'),
 
-    dcc.Dropdown(options=[{'label': opt, 'value': opt} for opt in opcoes], value='Geral', id='Tipo de Outorga'),
+    dcc.Dropdown(options=[{'label': opt, 'value': opt} for opt in opcoes], value='Geral', id='tipo-de-outorga-dropdown'),
 
     dcc.Dropdown(options=[{'label': ano, 'value': ano} for ano in anos], value='Geral', id='ano-dropdown'),
 
     dcc.Dropdown(options=[{'label': tipo, 'value': tipo} for tipo in tipos_pessoa], value='Geral', id='tipo-pessoa-dropdown'),
+
+    dcc.Checklist(
+        id='empresa-checklist',
+        options=[
+            {'label': 'Excluir as maiores', 'value': 'exclude'}
+        ],
+        value=[]
+    ),
 
     dcc.Graph(id='Acessos_Telefonia_Fixa_Total'),
 
@@ -144,6 +190,7 @@ app.layout = html.Div(children=[
 
     dcc.Graph(id='network-graph'),
 
+    dcc.Graph(id='line-chart'),
     html.Br(),
 
     # Botão que redireciona para os Heatmap
@@ -163,7 +210,7 @@ app.layout = html.Div(children=[
 # Callback para atualizar o gráfico Acessos_Telefonia_Fixa_Total
 @app.callback(
     Output('Acessos_Telefonia_Fixa_Total', 'figure'),
-    [Input('Tipo de Outorga', 'value')]
+    [Input('tipo-de-outorga-dropdown', 'value')]
 )
 def update_total(value):
     if value == "Geral":
@@ -177,7 +224,7 @@ def update_total(value):
 # Callback para atualizar o gráfico Acessos_Telefonia_Fixa_SP
 @app.callback(
     Output('Acessos_Telefonia_Fixa_SP', 'figure'),
-    [Input('Tipo de Outorga', 'value')]
+    [Input('tipo-de-outorga-dropdown', 'value')]
 )
 def update_sp(value1):
     if value1 == "Geral":
@@ -194,51 +241,80 @@ def update_sp(value1):
     [Input('ano-dropdown', 'value'), Input('tipo-pessoa-dropdown', 'value')]
 )
 def update_pie_chart(selected_year, selected_tipo_pessoa):
-    filtered_df = df_agrupado3.copy()
+    filtrado_df = df_agrupado3.copy()
 
     if selected_year != "Geral":
-        filtered_df = filtered_df[filtered_df['Ano'] == selected_year]
+        filtrado_df = filtrado_df[filtrado_df['Ano'] == selected_year]
     
     if selected_tipo_pessoa != "Geral":
-        filtered_df = filtered_df[filtered_df['Tipo de Pessoa'] == selected_tipo_pessoa]
+        filtrado_df = filtrado_df[filtrado_df['Tipo de Pessoa'] == selected_tipo_pessoa]
 
     # Tipo de gráfico
-    fig3 = px.pie(filtered_df, names='Empresa', values='Total_Acessos_Empresa', title=f'Distribuição de Acessos por Empresa em {selected_year}')
+    fig3 = px.pie(filtrado_df, names='Empresa', values='Total_Acessos_Empresa', title=f'Distribuição de Acessos por Empresa em {selected_year}')
     
     return fig3
 
 # Callback para atualizar o heatmap de correlação
 @app.callback(
     Output('network-graph', 'figure'),
-    [Input('ano-dropdown', 'value')]
+    [Input('ano-dropdown', 'value'), Input('empresa-checklist', 'value')]
 )
-def update_correlation_heatmap(selected_year):
-    filtered_df5 = df5.copy()
+def update_heatmap(selected_year, empresa_checklist):
+    filtrado_df5 = df5.copy()
 
     if selected_year != "Geral":
-        filtered_df5 = filtered_df5[filtered_df5['Ano'] == selected_year]
+        filtrado_df5 = filtrado_df5[filtrado_df5['Ano'] == selected_year]
 
-    # Calcula a matriz de correlação
-    correlation_matrix = filtered_df5.pivot_table(values='QT_PORTABILIDADE_EFETIVADA', 
-                                                  index='NO_PRESTADORA_DOADORA', 
-                                                  columns='NO_PRESTADORA_RECEPTORA', 
-                                                  aggfunc='sum').corr()
+    if 'exclude' in empresa_checklist:
+        filtrado_df5 = filtrado_df5[~filtrado_df5['NO_PRESTADORA_RECEPTORA'].isin(['TELEFONICA BRASIL', 'CLARO', 'OI S.A.', 'TIM S.A.'])]
+
+    # Cria a tabela dinâmica (pivot table) com a soma das portabilidades
+    pivot_table = filtrado_df5.pivot_table(values='QT_PORTABILIDADE_EFETIVADA', 
+                                           index='NO_PRESTADORA_DOADORA', 
+                                           columns='NO_PRESTADORA_RECEPTORA', 
+                                           aggfunc='sum', fill_value=0)
 
     # Cria o heatmap
-    fig4 = go.Figure(data=go.Heatmap(z=correlation_matrix.values,
-                                      x=correlation_matrix.columns,
-                                      y=correlation_matrix.index))
+    fig4 = go.Figure(data=go.Heatmap(z=pivot_table.values,
+                                     x=pivot_table.columns,
+                                     y=pivot_table.index,
+                                     colorscale='Viridis')) 
 
-    # Adiciona interatividade ao gráfico
+    # Adiciona interatividade ao gráfico e ajusta o tamanho
     fig4.update_layout(
-        title="Matriz de Correlação de Portabilidade",
-        xaxis=dict(title="Receptora"),
-        yaxis=dict(title="Doadora"),
-        plot_bgcolor='white'
+        title="Quantidade de Portabilidades Efetivadas",
+        xaxis=dict(title="Receptora", tickangle=45, tickfont=dict(size=10)),
+        yaxis=dict(title="Doadora", tickfont=dict(size=10)),
+        plot_bgcolor='white',
+        autosize=False,
+        width=1200,  # Ajusta a largura 
+        height=1000  # Ajusta a altura
     )
 
     return fig4
 
+# Callback para atualizar o gráfico de linha
+@app.callback(
+    Output('line-chart', 'figure'),
+    [Input('ano-dropdown', 'value')]
+)
+def update_line_chart(selected_year):
+    filtrado_df6 = df6.copy()
+
+    # Calcular o saldo (NO_PRESTADORA_RECEPTORA - NO_PRESTADORA_DOADORA)
+    agrupado = filtrado_df6.groupby(['Ano', 'NO_PRESTADORA_RECEPTORA']).agg(
+        Total_Receptora=('QT_PORTABILIDADE_EFETIVADA', 'sum')).reset_index()
+
+    agrupado2 = filtrado_df6.groupby(['Ano', 'NO_PRESTADORA_DOADORA']).agg(
+        Total_Doadora=('QT_PORTABILIDADE_EFETIVADA', 'sum')).reset_index()
+
+    combinado = pd.merge(agrupado, agrupado2, left_on=['Ano', 'NO_PRESTADORA_RECEPTORA'], right_on=['Ano', 'NO_PRESTADORA_DOADORA'], how='outer')
+    combinado = combinado.fillna(0)
+    combinado['Saldo'] = combinado['Total_Receptora'] -combinado['Total_Doadora']
+
+    fig5 = px.line(combinado, x='Ano', y='Saldo', color='NO_PRESTADORA_RECEPTORA', title='Saldo de Portabilidades ao Longo dos Anos')
+    
+    return fig5
 
 
 if __name__ == '__main__':  
