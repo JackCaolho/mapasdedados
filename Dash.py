@@ -1,4 +1,5 @@
 from dash import Dash, html, dcc, Input, Output
+import dash_bootstrap_components as dbc
 import plotly.express as px
 import plotly.graph_objs as go
 import pandas as pd
@@ -151,7 +152,7 @@ def serve_html_sabadoanimado():
     )
 
 # Inicializar o aplicativo Dash
-app = Dash(__name__, server=server)
+app = Dash(__name__, server=server, external_stylesheets=[dbc.themes.BOOTSTRAP])
 
 # Obter opções únicas
 opcoes = list(df_final['Tipo de Outorga'].unique())
@@ -164,46 +165,56 @@ tipos_pessoa = list(df_agrupado3['Tipo de Pessoa'].unique())
 tipos_pessoa.append("Geral")
 
 # Layout do aplicativo
-app.layout = html.Div(children=[
-    html.H1(children='Dados ANATEL'),
-    html.H2(children='Gráfico ao longo do tempo'),
-
-    dcc.Dropdown(options=[{'label': opt, 'value': opt} for opt in opcoes], value='Geral', id='tipo-de-outorga-dropdown'),
-
-    dcc.Dropdown(options=[{'label': ano, 'value': ano} for ano in anos], value='Geral', id='ano-dropdown'),
-
-    dcc.Dropdown(options=[{'label': tipo, 'value': tipo} for tipo in tipos_pessoa], value='Geral', id='tipo-pessoa-dropdown'),
-
-    dcc.Checklist(
-        id='empresa-checklist',
-        options=[
-            {'label': 'Excluir as maiores', 'value': 'exclude'}
-        ],
-        value=[]
+app.layout = dbc.Container(children=[
+    dbc.Row(
+        dbc.Col(html.H1("Dados ANATEL"), className="text-center my-4")
     ),
-
-    dcc.Graph(id='Acessos_Telefonia_Fixa_Total'),
-
-    dcc.Graph(id='Acessos_Telefonia_Fixa_SP'),
-
-    dcc.Graph(id='pie-chart'),
-
-    dcc.Graph(id='network-graph'),
-
-    dcc.Graph(id='line-chart'),
-    html.Br(),
-
-    # Botão que redireciona para os Heatmap
-    html.A(
-        html.Button('Heatmap tel fixo', id='link-button-1'),
-        href='/40028922',
-        target='_blank'  # Abre em uma nova aba
+    dbc.Row(
+        dbc.Col(html.H2("Estudo de acessos e portabilidade"), className="text-center mb-4")
     ),
-
-    html.A(
-        html.Button('Heatmap internet', id='link-button-2'),
-        href='/sabadoanimado',
-        target='_blank'  # Abre em uma nova aba
+    dbc.Row([
+        dbc.Col(dcc.Dropdown(options=[{'label': opt, 'value': opt} for opt in opcoes], value='Geral', id='tipo-de-outorga-dropdown'), width=4),
+        dbc.Col(dcc.Dropdown(options=[{'label': ano, 'value': ano} for ano in anos], value='Geral', id='ano-dropdown'), width=4),
+        dbc.Col(dcc.Dropdown(options=[{'label': tipo, 'value': tipo} for tipo in tipos_pessoa], value='Geral', id='tipo-pessoa-dropdown'), width=4)
+    ], className="mb-4"),
+    dbc.Row(
+        dbc.Col(dcc.Checklist(
+            id='empresa-checklist',
+            options=[
+                {'label': 'Excluir as maiores', 'value': 'exclude'}
+            ],
+            value=[],
+            inline=True
+        ), className="text-center mb-4")
+    ),
+    dbc.Row(
+        dbc.Col(dcc.Graph(id='Acessos_Telefonia_Fixa_Total'), className="mb-4")
+    ),
+    dbc.Row(
+        dbc.Col(dcc.Graph(id='Acessos_Telefonia_Fixa_SP'), className="mb-4")
+    ),
+    dbc.Row(
+        dbc.Col(dcc.Graph(id='pie-chart'), className="mb-4")
+    ),
+    dbc.Row(
+        dbc.Col(dcc.Graph(id='network-graph'), className="mb-4")
+    ),
+    dbc.Row(
+        dbc.Col(dcc.Graph(id='line-chart'), className="mb-4")
+    ),
+    dbc.Row(
+        dbc.Col([
+            html.A(
+                html.Button('Heatmap tel fixo', id='link-button-1', className="btn btn-primary mr-2"),
+                href='/40028922',
+                target='_blank'  # Abre em uma nova aba
+            ),
+            html.A(
+                html.Button('Heatmap internet', id='link-button-2', className="btn btn-primary"),
+                href='/sabadoanimado',
+                target='_blank'  # Abre em uma nova aba
+            )
+        ], className="text-center mb-4")
     )
 ])
 
@@ -214,11 +225,15 @@ app.layout = html.Div(children=[
 )
 def update_total(value):
     if value == "Geral":
-        #Tipo de gráfico
+        # Tipo de gráfico
         fig = px.bar(df1, x="Ano", y="Acessos", barmode="group")
     else:
         tabela_filtrada = df1.loc[df1['Tipo de Outorga'] == value, :]
         fig = px.bar(tabela_filtrada, x="Ano", y="Acessos", color="Tipo de Outorga", barmode="group")
+    
+    
+    fig.update_layout(title='Acessos por Ano')
+    
     return fig
 
 # Callback para atualizar o gráfico Acessos_Telefonia_Fixa_SP
@@ -233,6 +248,9 @@ def update_sp(value1):
     else:
         tabela_filtrada = df_final.loc[df_final['Tipo de Outorga'] == value1, :]
         fig2 = px.bar(tabela_filtrada, x="Ano", y="Total_Acessos", color="Tipo de Outorga", barmode="group")
+
+    fig2.update_layout(title='Acessos por Ano SP')
+    
     return fig2
 
 # Callback para atualizar o gráfico de pizza
